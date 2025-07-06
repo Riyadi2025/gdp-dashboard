@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Factory - Sports Video Analysis Platform</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>Pro Factory</h2>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item"><a href="#home" class="nav-link">Home</a></li>
+                <li class="nav-item dropdown">
+                    <a href="#" class="nav-link">Products <i class="fas fa-chevron-down"></i></a>
+                    <ul class="dropdown-menu">
+                        <li><a href="#analyze">Video Analysis</a></li>
+                        <li><a href="#upload">Upload & Process</a></li>
+                        <li><a href="#insights">Performance Insights</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item dropdown">
+                    <a href="#" class="nav-link">Sports <i class="fas fa-chevron-down"></i></a>
+                    <ul class="dropdown-menu">
+                        <li><a href="#soccer">Soccer</a></li>
+                        <li><a href="#basketball">Basketball</a></li>
+                        <li><a href="#hockey">Ice Hockey</a></li>
+                        <li><a href="#baseball">Baseball</a></li>
+                        <li><a href="#football">American Football</a></li>
+                        <li><a href="#more">More Sports</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item"><a href="#features" class="nav-link">Features</a></li>
+                <li class="nav-item"><a href="#contact" class="nav-link">Contact</a></li>
+            </ul>
+            <div class="nav-actions">
+                <a href="#login" class="btn-login">Login</a>
+                <a href="#demo" class="btn-demo">Get Demo</a>
+            </div>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <div class="hero-container">
+            <div class="hero-content">
+                <h1 class="hero-title">
+                    <span class="title-line">Analyze</span>
+                    <span class="title-line">Upload</span>
+                    <span class="title-line">Enhance</span>
+                    <span class="title-line">Every</span>
+                    <span class="title-line">Moment</span>
+                </h1>
+                <p class="hero-subtitle">
+                    Pro Factory's intelligent video analysis platform transforms your game footage into actionable insights. Upload videos or analyze from URLs - no cameras needed.
+                </p>
+                <div class="hero-actions">
+                    <a href="#upload" class="btn-primary">Start Analysis</a>
+                    <a href="#demo" class="btn-secondary">Watch Demo</a>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="video-preview">
+                    <div class="video-placeholder">
+                        <i class="fas fa-play-circle"></i>
+                        <p>Upload Your Game Video</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Upload Section -->
+    <section id="upload" class="upload-section">
+        <div class="container">
+            <h2 class="section-title">Upload & Analyze Your Game</h2>
+            <p class="section-subtitle">Get instant insights from your sports videos</p>
+            
+            <div class="upload-methods">
+                <div class="upload-card">
+                    <div class="upload-icon">
+                        <i class="fas fa-upload"></i>
+                    </div>
+                    <h3>Upload Video File</h3>
+                    <p>Drag and drop your game footage or click to browse</p>
+                    <div class="upload-area" id="fileUpload">
+                        <input type="file" id="videoFile" accept="video/*" hidden>
+                        <div class="upload-content">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Drag & drop your video here or <span class="upload-link">browse files</span></p>
+                            <small>Supports MP4, AVI, MOV, MKV up to 2GB</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="upload-card">
+                    <div class="upload-icon">
+                        <i class="fas fa-link"></i>
+                    </div>
+                    <h3>Analyze from URL</h3>
+                    <p>Enter a video URL to analyze game footage</p>
+                    <div class="url-input-container">
+                        <input type="url" id="videoUrl" placeholder="Enter video URL (YouTube, Vimeo, etc.)" class="url-input">
+                        <button class="btn-analyze" id="analyzeUrl">Analyze</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="upload-status" id="uploadStatus" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+                <p class="status-text">Processing video...</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features-section">
+        <div class="container">
+            <h2 class="section-title">The Complete Video Analysis Solution</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-brain"></i>
+                    </div>
+                    <h3>AI-Powered Analysis</h3>
+                    <p>Advanced machine learning algorithms analyze player movements, tactics, and performance metrics automatically.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3>Performance Insights</h3>
+                    <p>Get detailed breakdowns of team performance, individual player stats, and tactical analysis.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h3>Team Collaboration</h3>
+                    <p>Share analysis with coaches, players, and staff through our cloud-based platform.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-mobile-alt"></i>
+                    </div>
+                    <h3>Multi-Device Access</h3>
+                    <p>Access your analysis from anywhere - desktop, tablet, or mobile device.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <h3>Real-Time Processing</h3>
+                    <p>Fast video processing and analysis - get insights within minutes of upload.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h3>Secure & Private</h3>
+                    <p>Your video data is encrypted and stored securely in the cloud with enterprise-grade security.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sports Section -->
+    <section class="sports-section">
+        <div class="container">
+            <h2 class="section-title">Analyze Every Sport</h2>
+            <p class="section-subtitle">Pro Factory supports comprehensive analysis for all major sports</p>
+            
+            <div class="sports-grid">
+                <div class="sport-card">
+                    <div class="sport-icon">⚽</div>
+                    <h3>Soccer</h3>
+                    <p>Formation analysis, player tracking, passing patterns</p>
+                </div>
+                
+                <div class="sport-card">
+                    <div class="sport-icon">🏀</div>
+                    <h3>Basketball</h3>
+                    <p>Shot analysis, defensive positioning, player movements</p>
+                </div>
+                
+                <div class="sport-card">
+                    <div class="sport-icon">🏒</div>
+                    <h3>Ice Hockey</h3>
+                    <p>Play development, zone coverage, power play analysis</p>
+                </div>
+                
+                <div class="sport-card">
+                    <div class="sport-icon">⚾</div>
+                    <h3>Baseball</h3>
+                    <p>Pitch analysis, batting mechanics, fielding positions</p>
+                </div>
+                
+                <div class="sport-card">
+                    <div class="sport-icon">🏈</div>
+                    <h3>American Football</h3>
+                    <p>Formation recognition, route analysis, defensive schemes</p>
+                </div>
+                
+                <div class="sport-card">
+                    <div class="sport-icon">🎾</div>
+                    <h3>More Sports</h3>
+                    <p>Tennis, volleyball, rugby, and many more</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="container">
+            <h2>Ready to Transform Your Game Analysis?</h2>
+            <p>Join thousands of coaches and teams using Pro Factory to gain competitive advantages</p>
+            <div class="cta-actions">
+                <a href="#upload" class="btn-primary">Start Free Trial</a>
+                <a href="#contact" class="btn-secondary">Talk to Sales</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>Pro Factory</h4>
+                    <p>The leading sports video analysis platform for coaches, teams, and organizations worldwide.</p>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Products</h4>
+                    <ul>
+                        <li><a href="#analyze">Video Analysis</a></li>
+                        <li><a href="#upload">Upload & Process</a></li>
+                        <li><a href="#insights">Performance Insights</a></li>
+                        <li><a href="#collaboration">Team Collaboration</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Sports</h4>
+                    <ul>
+                        <li><a href="#soccer">Soccer</a></li>
+                        <li><a href="#basketball">Basketball</a></li>
+                        <li><a href="#hockey">Ice Hockey</a></li>
+                        <li><a href="#more">More Sports</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="#contact">Contact</a></li>
+                        <li><a href="#support">Support</a></li>
+                        <li><a href="#docs">Documentation</a></li>
+                        <li><a href="#privacy">Privacy Policy</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2024 Pro Factory. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
