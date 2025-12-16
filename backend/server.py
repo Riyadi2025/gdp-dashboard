@@ -86,6 +86,7 @@ class UserProfileUpdate(BaseModel):
     name: Optional[str] = None
     fitness_goal: Optional[str] = None
     fitness_level: Optional[str] = None
+    body_type: Optional[str] = None
     age: Optional[int] = None
     weight_kg: Optional[float] = None
     height_cm: Optional[float] = None
@@ -93,6 +94,7 @@ class UserProfileUpdate(BaseModel):
     workout_days_per_week: Optional[int] = None
     workout_duration_minutes: Optional[int] = None
     injuries_restrictions: Optional[str] = None
+    dietary_restrictions: Optional[str] = None
     onboarding_complete: Optional[bool] = None
 
 class TokenResponse(BaseModel):
