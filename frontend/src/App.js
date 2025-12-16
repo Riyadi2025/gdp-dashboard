@@ -468,7 +468,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const generateNewPlan = async () => {
     setGenerating(true);
