@@ -264,7 +264,7 @@ const OnboardingPage = ({ onComplete }) => {
               <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <Target className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">What's your fitness goal?</h2>
+              <h2 className="text-2xl font-bold text-white mb-2">What&apos;s your fitness goal?</h2>
               <p className="text-zinc-400">This helps us create the perfect plan for you</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
