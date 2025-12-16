@@ -1,15 +1,19 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
+from pydantic import BaseModel, Field, ConfigDict, EmailStr
+from typing import List, Optional
 import uuid
-from datetime import datetime, timezone
-
+from datetime import datetime, timezone, timedelta
+import jwt
+import bcrypt
+from emergentintegrations.llms.anthropic import AnthropicChat, AnthropicConfig
+import json
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -17,54 +21,452 @@ load_dotenv(ROOT_DIR / '.env')
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[os.environ.get('DB_NAME', 'motivaction_db')]
 
-# Create the main app without a prefix
-app = FastAPI()
+# JWT Settings
+JWT_SECRET = os.environ.get('JWT_SECRET', 'motivaction-secret-key')
+JWT_ALGORITHM = os.environ.get('JWT_ALGORITHM', 'HS256')
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get('ACCESS_TOKEN_EXPIRE_MINUTES', 1440))
+
+# Emergent LLM Key for Claude
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
+
+# Create the main app
+app = FastAPI(title="MotivAction API", version="1.0.0")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# Security
+security = HTTPBearer()
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# ==================== MODELS ====================
+
+class UserBase(BaseModel):
+    email: EmailStr
+    name: str
+
+class UserCreate(UserBase):
+    password: str
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserProfile(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    email: str
+    name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    
+    # Fitness profile fields
+    fitness_goal: Optional[str] = None  # weight_loss, muscle_gain, endurance, general_fitness
+    fitness_level: Optional[str] = None  # beginner, intermediate, advanced
+    age: Optional[int] = None
+    weight_kg: Optional[float] = None
+    height_cm: Optional[float] = None
+    available_equipment: Optional[List[str]] = []
+    workout_days_per_week: Optional[int] = 3
+    workout_duration_minutes: Optional[int] = 45
+    injuries_restrictions: Optional[str] = None
+    onboarding_complete: bool = False
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+class UserProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    fitness_goal: Optional[str] = None
+    fitness_level: Optional[str] = None
+    age: Optional[int] = None
+    weight_kg: Optional[float] = None
+    height_cm: Optional[float] = None
+    available_equipment: Optional[List[str]] = None
+    workout_days_per_week: Optional[int] = None
+    workout_duration_minutes: Optional[int] = None
+    injuries_restrictions: Optional[str] = None
+    onboarding_complete: Optional[bool] = None
 
-# Add your routes to the router instead of directly to app
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserProfile
+
+class Exercise(BaseModel):
+    name: str
+    sets: int
+    reps: str  # Can be "10-12" or "30 seconds" etc
+    rest_seconds: int
+    notes: Optional[str] = None
+    muscle_group: str
+
+class WorkoutDay(BaseModel):
+    day: str  # Monday, Tuesday, etc
+    workout_type: str  # Push, Pull, Legs, Full Body, etc
+    exercises: List[Exercise]
+    estimated_duration_minutes: int
+    warmup_notes: str
+    cooldown_notes: str
+
+class WorkoutPlan(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    plan_name: str
+    description: str
+    goal: str
+    level: str
+    duration_weeks: int
+    workout_days: List[WorkoutDay]
+    tips: List[str]
+    active: bool = True
+
+class WorkoutPlanRequest(BaseModel):
+    custom_instructions: Optional[str] = None
+
+class WorkoutPlanListItem(BaseModel):
+    id: str
+    plan_name: str
+    goal: str
+    level: str
+    created_at: datetime
+    active: bool
+
+# ==================== AUTH HELPERS ====================
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
+def create_access_token(user_id: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    payload = {"sub": user_id, "exp": expire}
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> UserProfile:
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        
+        user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+        if not user_doc:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        # Convert timestamp
+        if isinstance(user_doc.get('created_at'), str):
+            user_doc['created_at'] = datetime.fromisoformat(user_doc['created_at'])
+        
+        return UserProfile(**user_doc)
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+# ==================== AI WORKOUT GENERATION ====================
+
+async def generate_workout_plan_with_ai(user: UserProfile, custom_instructions: Optional[str] = None) -> dict:
+    """Generate a personalized workout plan using Claude via Emergent Integration"""
+    
+    config = AnthropicConfig(
+        api_key=EMERGENT_LLM_KEY,
+        model="claude-sonnet-4-20250514"
+    )
+    chat = AnthropicChat(config=config)
+    
+    equipment_str = ", ".join(user.available_equipment) if user.available_equipment else "No equipment (bodyweight only)"
+    
+    prompt = f"""You are an expert fitness coach creating a personalized workout plan.
+
+USER PROFILE:
+- Name: {user.name}
+- Fitness Goal: {user.fitness_goal or 'general fitness'}
+- Fitness Level: {user.fitness_level or 'beginner'}
+- Age: {user.age or 'Not specified'}
+- Weight: {user.weight_kg or 'Not specified'} kg
+- Height: {user.height_cm or 'Not specified'} cm
+- Available Equipment: {equipment_str}
+- Workout Days Per Week: {user.workout_days_per_week or 3}
+- Preferred Workout Duration: {user.workout_duration_minutes or 45} minutes
+- Injuries/Restrictions: {user.injuries_restrictions or 'None mentioned'}
+
+{f'CUSTOM INSTRUCTIONS: {custom_instructions}' if custom_instructions else ''}
+
+Create a detailed {user.workout_days_per_week or 3}-day workout plan. Return ONLY valid JSON (no markdown, no code blocks) in this exact structure:
+
+{{
+    "plan_name": "Creative motivating name for this plan",
+    "description": "Brief description of the plan and expected outcomes",
+    "goal": "{user.fitness_goal or 'general_fitness'}",
+    "level": "{user.fitness_level or 'beginner'}",
+    "duration_weeks": 4,
+    "workout_days": [
+        {{
+            "day": "Day 1 - Monday",
+            "workout_type": "Type of workout (e.g., Push, Full Body)",
+            "exercises": [
+                {{
+                    "name": "Exercise name",
+                    "sets": 3,
+                    "reps": "10-12",
+                    "rest_seconds": 60,
+                    "notes": "Form tips or modifications",
+                    "muscle_group": "Primary muscle group"
+                }}
+            ],
+            "estimated_duration_minutes": 45,
+            "warmup_notes": "5-min warmup routine",
+            "cooldown_notes": "5-min cooldown routine"
+        }}
+    ],
+    "tips": ["Tip 1", "Tip 2", "Tip 3"]
+}}
+
+Include 4-6 exercises per workout day. Make exercises appropriate for the user's level and equipment. Be specific with exercise names and provide helpful form notes."""
+
+    try:
+        response = await chat.send_message_async(prompt)
+        response_text = response.strip()
+        
+        # Clean up response - remove markdown code blocks if present
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+        
+        plan_data = json.loads(response_text.strip())
+        return plan_data
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse AI response: {e}")
+        logger.error(f"Response was: {response_text[:500]}...")
+        raise HTTPException(status_code=500, detail="Failed to parse workout plan from AI")
+    except Exception as e:
+        logger.error(f"AI generation error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate workout plan: {str(e)}")
+
+# ==================== AUTH ROUTES ====================
+
+@api_router.post("/auth/register", response_model=TokenResponse)
+async def register(user_data: UserCreate):
+    """Register a new user"""
+    # Check if email exists
+    existing = await db.users.find_one({"email": user_data.email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Create user
+    user_id = str(uuid.uuid4())
+    user_doc = {
+        "id": user_id,
+        "email": user_data.email,
+        "name": user_data.name,
+        "password_hash": hash_password(user_data.password),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "fitness_goal": None,
+        "fitness_level": None,
+        "age": None,
+        "weight_kg": None,
+        "height_cm": None,
+        "available_equipment": [],
+        "workout_days_per_week": 3,
+        "workout_duration_minutes": 45,
+        "injuries_restrictions": None,
+        "onboarding_complete": False
+    }
+    
+    await db.users.insert_one(user_doc)
+    
+    # Create token
+    token = create_access_token(user_id)
+    
+    # Return user without password
+    user_doc.pop('password_hash')
+    user_doc.pop('_id', None)
+    user_doc['created_at'] = datetime.fromisoformat(user_doc['created_at'])
+    
+    return TokenResponse(access_token=token, user=UserProfile(**user_doc))
+
+@api_router.post("/auth/login", response_model=TokenResponse)
+async def login(credentials: UserLogin):
+    """Login user"""
+    user_doc = await db.users.find_one({"email": credentials.email})
+    if not user_doc:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    if not verify_password(credentials.password, user_doc['password_hash']):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    token = create_access_token(user_doc['id'])
+    
+    # Return user without password
+    user_doc.pop('password_hash')
+    user_doc.pop('_id', None)
+    if isinstance(user_doc.get('created_at'), str):
+        user_doc['created_at'] = datetime.fromisoformat(user_doc['created_at'])
+    
+    return TokenResponse(access_token=token, user=UserProfile(**user_doc))
+
+@api_router.get("/auth/me", response_model=UserProfile)
+async def get_me(current_user: UserProfile = Depends(get_current_user)):
+    """Get current user profile"""
+    return current_user
+
+# ==================== USER PROFILE ROUTES ====================
+
+@api_router.put("/profile", response_model=UserProfile)
+async def update_profile(
+    profile_update: UserProfileUpdate,
+    current_user: UserProfile = Depends(get_current_user)
+):
+    """Update user profile (including onboarding data)"""
+    update_data = {k: v for k, v in profile_update.model_dump().items() if v is not None}
+    
+    if not update_data:
+        return current_user
+    
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": update_data}
+    )
+    
+    # Get updated user
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0, "password_hash": 0})
+    if isinstance(user_doc.get('created_at'), str):
+        user_doc['created_at'] = datetime.fromisoformat(user_doc['created_at'])
+    
+    return UserProfile(**user_doc)
+
+# ==================== WORKOUT PLAN ROUTES ====================
+
+@api_router.post("/workout-plans/generate", response_model=WorkoutPlan)
+async def generate_workout_plan(
+    request: WorkoutPlanRequest,
+    current_user: UserProfile = Depends(get_current_user)
+):
+    """Generate a new AI-powered workout plan"""
+    # Deactivate existing active plans
+    await db.workout_plans.update_many(
+        {"user_id": current_user.id, "active": True},
+        {"$set": {"active": False}}
+    )
+    
+    # Generate new plan with AI
+    plan_data = await generate_workout_plan_with_ai(current_user, request.custom_instructions)
+    
+    # Create workout plan document
+    plan = WorkoutPlan(
+        user_id=current_user.id,
+        **plan_data
+    )
+    
+    # Save to database
+    plan_doc = plan.model_dump()
+    plan_doc['created_at'] = plan_doc['created_at'].isoformat()
+    await db.workout_plans.insert_one(plan_doc)
+    
+    return plan
+
+@api_router.get("/workout-plans", response_model=List[WorkoutPlanListItem])
+async def get_workout_plans(current_user: UserProfile = Depends(get_current_user)):
+    """Get all workout plans for current user"""
+    plans = await db.workout_plans.find(
+        {"user_id": current_user.id},
+        {"_id": 0, "id": 1, "plan_name": 1, "goal": 1, "level": 1, "created_at": 1, "active": 1}
+    ).sort("created_at", -1).to_list(100)
+    
+    for plan in plans:
+        if isinstance(plan.get('created_at'), str):
+            plan['created_at'] = datetime.fromisoformat(plan['created_at'])
+    
+    return plans
+
+@api_router.get("/workout-plans/active", response_model=Optional[WorkoutPlan])
+async def get_active_workout_plan(current_user: UserProfile = Depends(get_current_user)):
+    """Get the active workout plan"""
+    plan = await db.workout_plans.find_one(
+        {"user_id": current_user.id, "active": True},
+        {"_id": 0}
+    )
+    
+    if not plan:
+        return None
+    
+    if isinstance(plan.get('created_at'), str):
+        plan['created_at'] = datetime.fromisoformat(plan['created_at'])
+    
+    return WorkoutPlan(**plan)
+
+@api_router.get("/workout-plans/{plan_id}", response_model=WorkoutPlan)
+async def get_workout_plan(plan_id: str, current_user: UserProfile = Depends(get_current_user)):
+    """Get a specific workout plan"""
+    plan = await db.workout_plans.find_one(
+        {"id": plan_id, "user_id": current_user.id},
+        {"_id": 0}
+    )
+    
+    if not plan:
+        raise HTTPException(status_code=404, detail="Workout plan not found")
+    
+    if isinstance(plan.get('created_at'), str):
+        plan['created_at'] = datetime.fromisoformat(plan['created_at'])
+    
+    return WorkoutPlan(**plan)
+
+@api_router.put("/workout-plans/{plan_id}/activate")
+async def activate_workout_plan(plan_id: str, current_user: UserProfile = Depends(get_current_user)):
+    """Set a workout plan as active"""
+    # Check plan exists and belongs to user
+    plan = await db.workout_plans.find_one({"id": plan_id, "user_id": current_user.id})
+    if not plan:
+        raise HTTPException(status_code=404, detail="Workout plan not found")
+    
+    # Deactivate all other plans
+    await db.workout_plans.update_many(
+        {"user_id": current_user.id},
+        {"$set": {"active": False}}
+    )
+    
+    # Activate this plan
+    await db.workout_plans.update_one(
+        {"id": plan_id},
+        {"$set": {"active": True}}
+    )
+    
+    return {"message": "Plan activated successfully"}
+
+@api_router.delete("/workout-plans/{plan_id}")
+async def delete_workout_plan(plan_id: str, current_user: UserProfile = Depends(get_current_user)):
+    """Delete a workout plan"""
+    result = await db.workout_plans.delete_one({"id": plan_id, "user_id": current_user.id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Workout plan not found")
+    
+    return {"message": "Plan deleted successfully"}
+
+# ==================== HEALTH & ROOT ====================
+
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "MotivAction API - Your AI Fitness Coach", "version": "1.0.0"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
-
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
+@api_router.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "motivaction"}
 
 # Include the router in the main app
 app.include_router(api_router)
@@ -76,13 +478,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
