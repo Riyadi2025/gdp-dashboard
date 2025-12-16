@@ -105,6 +105,62 @@ class Exercise(BaseModel):
     rest_seconds: int
     notes: Optional[str] = None
     muscle_group: str
+    image_url: Optional[str] = None
+
+# Exercise image mapping for common exercises
+EXERCISE_IMAGES = {
+    # Chest exercises
+    "bench press": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&q=80",
+    "barbell bench press": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&q=80",
+    "dumbbell chest press": "https://images.unsplash.com/photo-1598268030450-7a476f602406?w=400&q=80",
+    "incline press": "https://images.unsplash.com/photo-1598268030450-7a476f602406?w=400&q=80",
+    "push-ups": "https://images.unsplash.com/photo-1598971639058-fab3c3109a00?w=400&q=80",
+    "chest fly": "https://images.unsplash.com/photo-1598268030450-7a476f602406?w=400&q=80",
+    # Back exercises
+    "pull-ups": "https://images.unsplash.com/photo-1598971457999-ca4ef48a9a71?w=400&q=80",
+    "chin-ups": "https://images.unsplash.com/photo-1598971457999-ca4ef48a9a71?w=400&q=80",
+    "barbell rows": "https://images.unsplash.com/photo-1603287681836-b174ce5074c2?w=400&q=80",
+    "bent-over rows": "https://images.unsplash.com/photo-1603287681836-b174ce5074c2?w=400&q=80",
+    "dumbbell rows": "https://images.unsplash.com/photo-1603287681836-b174ce5074c2?w=400&q=80",
+    "lat pulldown": "https://images.unsplash.com/photo-1534368786749-b63e05c92717?w=400&q=80",
+    "deadlift": "https://images.unsplash.com/photo-1566241142559-40e1dab266c6?w=400&q=80",
+    "romanian deadlift": "https://images.unsplash.com/photo-1566241142559-40e1dab266c6?w=400&q=80",
+    # Shoulder exercises
+    "shoulder press": "https://images.unsplash.com/photo-1532029837206-abbe2b7620e3?w=400&q=80",
+    "dumbbell shoulder press": "https://images.unsplash.com/photo-1532029837206-abbe2b7620e3?w=400&q=80",
+    "lateral raises": "https://images.unsplash.com/photo-1581009146145-b5ef050c149a?w=400&q=80",
+    "front raises": "https://images.unsplash.com/photo-1581009146145-b5ef050c149a?w=400&q=80",
+    # Leg exercises
+    "squats": "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=400&q=80",
+    "barbell squats": "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=400&q=80",
+    "back squats": "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=400&q=80",
+    "lunges": "https://images.unsplash.com/photo-1434682881908-b43d0467b798?w=400&q=80",
+    "leg press": "https://images.unsplash.com/photo-1434682881908-b43d0467b798?w=400&q=80",
+    "leg curls": "https://images.unsplash.com/photo-1434682881908-b43d0467b798?w=400&q=80",
+    "calf raises": "https://images.unsplash.com/photo-1434682881908-b43d0467b798?w=400&q=80",
+    "split squats": "https://images.unsplash.com/photo-1434682881908-b43d0467b798?w=400&q=80",
+    "step-ups": "https://images.unsplash.com/photo-1434682881908-b43d0467b798?w=400&q=80",
+    # Arm exercises
+    "bicep curls": "https://images.unsplash.com/photo-1581009146145-b5ef050c149a?w=400&q=80",
+    "hammer curls": "https://images.unsplash.com/photo-1581009146145-b5ef050c149a?w=400&q=80",
+    "tricep dips": "https://images.unsplash.com/photo-1598971639058-fab3c3109a00?w=400&q=80",
+    "tricep extensions": "https://images.unsplash.com/photo-1581009146145-b5ef050c149a?w=400&q=80",
+    "close-grip press": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&q=80",
+    # Core exercises
+    "plank": "https://images.unsplash.com/photo-1566241142559-40e1dab266c6?w=400&q=80",
+    "crunches": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&q=80",
+    "russian twists": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&q=80",
+    # Default
+    "default": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80"
+}
+
+def get_exercise_image(exercise_name: str) -> str:
+    """Get image URL for an exercise based on name matching"""
+    name_lower = exercise_name.lower()
+    for key, url in EXERCISE_IMAGES.items():
+        if key in name_lower or name_lower in key:
+            return url
+    return EXERCISE_IMAGES["default"]
 
 class WorkoutDay(BaseModel):
     day: str  # Monday, Tuesday, etc
