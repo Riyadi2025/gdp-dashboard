@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
-from emergentintegrations.llm.chat import LlmChat
+from emergentintegrations.llm.chat import LlmChat, UserMessage
 import json
 
 ROOT_DIR = Path(__file__).parent
