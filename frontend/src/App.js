@@ -299,7 +299,7 @@ const OnboardingPage = ({ onComplete }) => {
                 <Trophy className="w-8 h-8 text-white" />
               </div>
               <h2 className="text-2xl font-bold text-white mb-2">Your fitness level?</h2>
-              <p className="text-zinc-400">Be honest - we'll match your workouts accordingly</p>
+              <p className="text-zinc-400">Be honest - we&apos;ll match your workouts accordingly</p>
             </div>
             <div className="space-y-4">
               {[
