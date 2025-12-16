@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
-from emergentintegrations.llms.anthropic import AnthropicChat, AnthropicConfig
+from emergentintegrations.llm.chat import LlmChat
 import json
 
 ROOT_DIR = Path(__file__).parent
