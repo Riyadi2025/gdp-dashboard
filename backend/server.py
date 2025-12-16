@@ -388,6 +388,12 @@ Include 4-6 exercises per workout day. Make exercises appropriate for the user's
             response_text = response_text[:-3]
         
         plan_data = json.loads(response_text.strip())
+        
+        # Add images to exercises
+        for day in plan_data.get("workout_days", []):
+            for exercise in day.get("exercises", []):
+                exercise["image_url"] = get_exercise_image(exercise.get("name", ""))
+        
         return plan_data
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse AI response: {e}")
