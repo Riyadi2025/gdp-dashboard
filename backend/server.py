@@ -603,6 +603,212 @@ async def delete_workout_plan(plan_id: str, current_user: UserProfile = Depends(
     
     return {"message": "Plan deleted successfully"}
 
+# ==================== NUTRITION PLAN GENERATION ====================
+
+async def generate_nutrition_plan_with_ai(user: UserProfile, body_type: str, dietary_restrictions: Optional[str] = None, custom_instructions: Optional[str] = None) -> dict:
+    """Generate a personalized nutrition plan using Claude via Emergent Integration"""
+    
+    chat = LlmChat(
+        api_key=EMERGENT_LLM_KEY,
+        session_id=f"nutrition-{user.id}-{uuid.uuid4()}",
+        system_message="You are an expert nutritionist creating personalized meal plans."
+    ).with_model("anthropic", "claude-sonnet-4-20250514")
+    
+    # Calculate base calories based on body type and goal
+    base_calories = 2000
+    if user.weight_kg and user.height_cm and user.age:
+        # Basic BMR calculation (Mifflin-St Jeor)
+        bmr = 10 * user.weight_kg + 6.25 * user.height_cm - 5 * user.age + 5
+        activity_multiplier = 1.55  # Moderate activity
+        base_calories = int(bmr * activity_multiplier)
+        
+        # Adjust based on goal
+        if user.fitness_goal == "weight_loss":
+            base_calories = int(base_calories * 0.8)  # 20% deficit
+        elif user.fitness_goal == "muscle_gain":
+            base_calories = int(base_calories * 1.15)  # 15% surplus
+    
+    prompt = f"""You are an expert nutritionist creating a personalized meal plan.
+
+USER PROFILE:
+- Name: {user.name}
+- Fitness Goal: {user.fitness_goal or 'general fitness'}
+- Body Type: {body_type}
+- Age: {user.age or 'Not specified'}
+- Weight: {user.weight_kg or 'Not specified'} kg
+- Height: {user.height_cm or 'Not specified'} cm
+- Estimated Daily Calories: {base_calories}
+- Dietary Restrictions: {dietary_restrictions or 'None mentioned'}
+
+{f'CUSTOM INSTRUCTIONS: {custom_instructions}' if custom_instructions else ''}
+
+BODY TYPE CONSIDERATIONS:
+- Ectomorph: Higher carb intake, frequent meals, calorie-dense foods
+- Mesomorph: Balanced macros, moderate portions
+- Endomorph: Lower carb, higher protein, controlled portions
+
+Create a detailed 7-day meal plan. Return ONLY valid JSON (no markdown, no code blocks) in this exact structure:
+
+{{
+    "plan_name": "Creative motivating name for this nutrition plan",
+    "description": "Brief description of the plan and expected outcomes",
+    "goal": "{user.fitness_goal or 'general_fitness'}",
+    "body_type": "{body_type}",
+    "daily_calories": {base_calories},
+    "protein_target_g": {int(base_calories * 0.3 / 4)},
+    "carbs_target_g": {int(base_calories * 0.4 / 4)},
+    "fat_target_g": {int(base_calories * 0.3 / 9)},
+    "meal_plans": [
+        {{
+            "day": "Monday",
+            "meals": [
+                {{
+                    "name": "Protein-Packed Breakfast Bowl",
+                    "time": "7:00 AM",
+                    "calories": 450,
+                    "protein_g": 35,
+                    "carbs_g": 40,
+                    "fat_g": 15,
+                    "ingredients": ["ingredient 1", "ingredient 2"],
+                    "instructions": "Brief cooking instructions"
+                }}
+            ],
+            "total_calories": 2000,
+            "total_protein_g": 150,
+            "total_carbs_g": 200,
+            "total_fat_g": 65,
+            "snacks": ["Snack option 1", "Snack option 2"],
+            "hydration_tip": "Drink 8-10 glasses of water"
+        }}
+    ],
+    "tips": ["Tip 1", "Tip 2", "Tip 3"],
+    "foods_to_avoid": ["Food 1", "Food 2"],
+    "foods_to_include": ["Food 1", "Food 2"]
+}}
+
+Include 4 meals per day (breakfast, lunch, dinner, post-workout/evening snack). Make meals realistic, tasty, and aligned with the user's goal and body type."""
+
+    try:
+        user_msg = UserMessage(text=prompt)
+        response = await chat.send_message(user_msg)
+        response_text = response.strip()
+        
+        # Clean up response
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+        
+        plan_data = json.loads(response_text.strip())
+        
+        # Add images to meals
+        for day in plan_data.get("meal_plans", []):
+            for meal in day.get("meals", []):
+                meal["image_url"] = get_meal_image(meal.get("name", ""))
+        
+        return plan_data
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse AI response: {e}")
+        raise HTTPException(status_code=500, detail="Failed to parse nutrition plan from AI")
+    except Exception as e:
+        logger.error(f"AI generation error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate nutrition plan: {str(e)}")
+
+# ==================== NUTRITION PLAN ROUTES ====================
+
+@api_router.post("/nutrition-plans/generate", response_model=NutritionPlan)
+async def generate_nutrition_plan(
+    request: NutritionPlanRequest,
+    current_user: UserProfile = Depends(get_current_user)
+):
+    """Generate a new AI-powered nutrition plan"""
+    # Deactivate existing active plans
+    await db.nutrition_plans.update_many(
+        {"user_id": current_user.id, "active": True},
+        {"$set": {"active": False}}
+    )
+    
+    body_type = request.body_type or "mesomorph"  # Default to balanced
+    
+    # Generate new plan with AI
+    plan_data = await generate_nutrition_plan_with_ai(
+        current_user, 
+        body_type, 
+        request.dietary_restrictions,
+        request.custom_instructions
+    )
+    
+    # Create nutrition plan document
+    plan = NutritionPlan(
+        user_id=current_user.id,
+        **plan_data
+    )
+    
+    # Save to database
+    plan_doc = plan.model_dump()
+    plan_doc['created_at'] = plan_doc['created_at'].isoformat()
+    await db.nutrition_plans.insert_one(plan_doc)
+    
+    return plan
+
+@api_router.get("/nutrition-plans", response_model=List[NutritionPlanListItem])
+async def get_nutrition_plans(current_user: UserProfile = Depends(get_current_user)):
+    """Get all nutrition plans for current user"""
+    plans = await db.nutrition_plans.find(
+        {"user_id": current_user.id},
+        {"_id": 0, "id": 1, "plan_name": 1, "goal": 1, "body_type": 1, "daily_calories": 1, "created_at": 1, "active": 1}
+    ).sort("created_at", -1).to_list(100)
+    
+    for plan in plans:
+        if isinstance(plan.get('created_at'), str):
+            plan['created_at'] = datetime.fromisoformat(plan['created_at'])
+    
+    return plans
+
+@api_router.get("/nutrition-plans/active", response_model=Optional[NutritionPlan])
+async def get_active_nutrition_plan(current_user: UserProfile = Depends(get_current_user)):
+    """Get the active nutrition plan"""
+    plan = await db.nutrition_plans.find_one(
+        {"user_id": current_user.id, "active": True},
+        {"_id": 0}
+    )
+    
+    if not plan:
+        return None
+    
+    if isinstance(plan.get('created_at'), str):
+        plan['created_at'] = datetime.fromisoformat(plan['created_at'])
+    
+    return NutritionPlan(**plan)
+
+@api_router.get("/nutrition-plans/{plan_id}", response_model=NutritionPlan)
+async def get_nutrition_plan(plan_id: str, current_user: UserProfile = Depends(get_current_user)):
+    """Get a specific nutrition plan"""
+    plan = await db.nutrition_plans.find_one(
+        {"id": plan_id, "user_id": current_user.id},
+        {"_id": 0}
+    )
+    
+    if not plan:
+        raise HTTPException(status_code=404, detail="Nutrition plan not found")
+    
+    if isinstance(plan.get('created_at'), str):
+        plan['created_at'] = datetime.fromisoformat(plan['created_at'])
+    
+    return NutritionPlan(**plan)
+
+@api_router.delete("/nutrition-plans/{plan_id}")
+async def delete_nutrition_plan(plan_id: str, current_user: UserProfile = Depends(get_current_user)):
+    """Delete a nutrition plan"""
+    result = await db.nutrition_plans.delete_one({"id": plan_id, "user_id": current_user.id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Nutrition plan not found")
+    
+    return {"message": "Plan deleted successfully"}
+
 # ==================== HEALTH & ROOT ====================
 
 @api_router.get("/")
