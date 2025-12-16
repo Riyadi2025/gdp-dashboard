@@ -196,6 +196,87 @@ class WorkoutPlanListItem(BaseModel):
     created_at: datetime
     active: bool
 
+# ==================== NUTRITION MODELS ====================
+
+class Meal(BaseModel):
+    name: str
+    time: str  # e.g., "7:00 AM"
+    calories: int
+    protein_g: int
+    carbs_g: int
+    fat_g: int
+    ingredients: List[str]
+    instructions: str
+    image_url: Optional[str] = None
+
+class DailyMealPlan(BaseModel):
+    day: str  # Monday, Tuesday, etc
+    meals: List[Meal]
+    total_calories: int
+    total_protein_g: int
+    total_carbs_g: int
+    total_fat_g: int
+    snacks: List[str]
+    hydration_tip: str
+
+class NutritionPlan(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    plan_name: str
+    description: str
+    goal: str
+    body_type: str  # ectomorph, mesomorph, endomorph
+    daily_calories: int
+    protein_target_g: int
+    carbs_target_g: int
+    fat_target_g: int
+    meal_plans: List[DailyMealPlan]
+    tips: List[str]
+    foods_to_avoid: List[str]
+    foods_to_include: List[str]
+    active: bool = True
+
+class NutritionPlanRequest(BaseModel):
+    body_type: Optional[str] = None  # ectomorph, mesomorph, endomorph
+    dietary_restrictions: Optional[str] = None  # vegan, vegetarian, keto, etc
+    custom_instructions: Optional[str] = None
+
+class NutritionPlanListItem(BaseModel):
+    id: str
+    plan_name: str
+    goal: str
+    body_type: str
+    daily_calories: int
+    created_at: datetime
+    active: bool
+
+# Meal image mapping
+MEAL_IMAGES = {
+    "breakfast": "https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=400&q=80",
+    "lunch": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80",
+    "dinner": "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=400&q=80",
+    "snack": "https://images.unsplash.com/photo-1568702846914-96b305d2uj38?w=400&q=80",
+    "protein": "https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=400&q=80",
+    "salad": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&q=80",
+    "chicken": "https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=400&q=80",
+    "fish": "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=400&q=80",
+    "eggs": "https://images.unsplash.com/photo-1482049016gy-2c3e12099f93?w=400&q=80",
+    "oatmeal": "https://images.unsplash.com/photo-1517673400267-0251440c45dc?w=400&q=80",
+    "smoothie": "https://images.unsplash.com/photo-1505576399279-565b52d4ac71?w=400&q=80",
+    "default": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&q=80"
+}
+
+def get_meal_image(meal_name: str) -> str:
+    """Get image URL for a meal based on name matching"""
+    name_lower = meal_name.lower()
+    for key, url in MEAL_IMAGES.items():
+        if key in name_lower:
+            return url
+    return MEAL_IMAGES["default"]
+
 # ==================== AUTH HELPERS ====================
 
 def hash_password(password: str) -> str:
