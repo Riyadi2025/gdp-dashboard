@@ -180,11 +180,12 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 async def generate_workout_plan_with_ai(user: UserProfile, custom_instructions: Optional[str] = None) -> dict:
     """Generate a personalized workout plan using Claude via Emergent Integration"""
     
-    config = AnthropicConfig(
+    # Use Emergent LLM integration with Claude
+    chat = LlmChat(
         api_key=EMERGENT_LLM_KEY,
-        model="claude-sonnet-4-20250514"
-    )
-    chat = AnthropicChat(config=config)
+        session_id=f"workout-{user.id}-{uuid.uuid4()}",
+        system_message="You are an expert fitness coach creating personalized workout plans."
+    ).with_model("anthropic", "claude-sonnet-4-20250514")
     
     equipment_str = ", ".join(user.available_equipment) if user.available_equipment else "No equipment (bodyweight only)"
     
