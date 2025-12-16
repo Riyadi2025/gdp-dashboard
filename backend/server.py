@@ -238,7 +238,7 @@ Create a detailed {user.workout_days_per_week or 3}-day workout plan. Return ONL
 Include 4-6 exercises per workout day. Make exercises appropriate for the user's level and equipment. Be specific with exercise names and provide helpful form notes."""
 
     try:
-        response = await chat.send_message_async(prompt)
+        response = await chat.send_message(prompt)
         response_text = response.strip()
         
         # Clean up response - remove markdown code blocks if present
