@@ -71,6 +71,7 @@ class UserProfile(BaseModel):
     # Fitness profile fields
     fitness_goal: Optional[str] = None  # weight_loss, muscle_gain, endurance, general_fitness
     fitness_level: Optional[str] = None  # beginner, intermediate, advanced
+    body_type: Optional[str] = None  # ectomorph, mesomorph, endomorph
     age: Optional[int] = None
     weight_kg: Optional[float] = None
     height_cm: Optional[float] = None
@@ -78,6 +79,7 @@ class UserProfile(BaseModel):
     workout_days_per_week: Optional[int] = 3
     workout_duration_minutes: Optional[int] = 45
     injuries_restrictions: Optional[str] = None
+    dietary_restrictions: Optional[str] = None
     onboarding_complete: bool = False
 
 class UserProfileUpdate(BaseModel):
