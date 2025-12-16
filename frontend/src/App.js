@@ -792,17 +792,14 @@ const Dashboard = () => {
 // ==================== MAIN APP ====================
 
 function App() {
-  const [authState, setAuthState] = useState({ user: null, token: null, loading: true });
-
-  useEffect(() => {
+  const [authState, setAuthState] = useState(() => {
     const token = localStorage.getItem("motivaction_token");
     const user = localStorage.getItem("motivaction_user");
     if (token && user) {
-      setAuthState({ token, user: JSON.parse(user), loading: false });
-    } else {
-      setAuthState({ user: null, token: null, loading: false });
+      return { token, user: JSON.parse(user), loading: false };
     }
-  }, []);
+    return { user: null, token: null, loading: false };
+  });
 
   const handleLogin = (data) => {
     localStorage.setItem("motivaction_token", data.access_token);
