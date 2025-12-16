@@ -427,6 +427,7 @@ async def register(user_data: UserCreate):
         "created_at": datetime.now(timezone.utc).isoformat(),
         "fitness_goal": None,
         "fitness_level": None,
+        "body_type": None,
         "age": None,
         "weight_kg": None,
         "height_cm": None,
@@ -434,6 +435,7 @@ async def register(user_data: UserCreate):
         "workout_days_per_week": 3,
         "workout_duration_minutes": 45,
         "injuries_restrictions": None,
+        "dietary_restrictions": None,
         "onboarding_complete": False
     }
     
