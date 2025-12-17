@@ -1051,8 +1051,16 @@ async def get_personal_records(current_user: UserProfile = Depends(get_current_u
     
     return records
 
-async def check_and_update_pr(user_id: str, exercise_name: str, weight: float, reps: int, date: str):
+async def check_and_update_pr(user_id: str, exercise_name: str, weight: float, reps, date: str):
     """Check if this is a new personal record"""
+    # Convert reps to int if it's a string like "8-10"
+    try:
+        if isinstance(reps, str):
+            reps = int(reps.split('-')[0].split()[0])  # Take first number
+        reps = int(reps)
+    except (ValueError, AttributeError):
+        reps = 10  # Default
+    
     existing_pr = await db.personal_records.find_one({
         "user_id": user_id,
         "exercise_name": exercise_name
