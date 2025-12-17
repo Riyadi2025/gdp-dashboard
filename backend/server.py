@@ -653,11 +653,11 @@ BODY TYPE CONSIDERATIONS:
 - Mesomorph: Balanced macros, moderate portions
 - Endomorph: Lower carb, higher protein, controlled portions
 
-Create a detailed 7-day meal plan. Return ONLY valid JSON (no markdown, no code blocks) in this exact structure:
+Create a 3-day sample meal plan that can be repeated. Return ONLY valid JSON (no markdown) in this structure:
 
 {{
-    "plan_name": "Creative motivating name for this nutrition plan",
-    "description": "Brief description of the plan and expected outcomes",
+    "plan_name": "Creative name",
+    "description": "Brief description",
     "goal": "{user.fitness_goal or 'general_fitness'}",
     "body_type": "{body_type}",
     "daily_calories": {base_calories},
@@ -666,33 +666,24 @@ Create a detailed 7-day meal plan. Return ONLY valid JSON (no markdown, no code 
     "fat_target_g": {int(base_calories * 0.3 / 9)},
     "meal_plans": [
         {{
-            "day": "Monday",
+            "day": "Day 1",
             "meals": [
-                {{
-                    "name": "Protein-Packed Breakfast Bowl",
-                    "time": "7:00 AM",
-                    "calories": 450,
-                    "protein_g": 35,
-                    "carbs_g": 40,
-                    "fat_g": 15,
-                    "ingredients": ["ingredient 1", "ingredient 2"],
-                    "instructions": "Brief cooking instructions"
-                }}
+                {{"name": "Meal name", "time": "7:00 AM", "calories": 450, "protein_g": 35, "carbs_g": 40, "fat_g": 15, "ingredients": ["item1", "item2"], "instructions": "Brief instructions"}}
             ],
-            "total_calories": 2000,
-            "total_protein_g": 150,
-            "total_carbs_g": 200,
-            "total_fat_g": 65,
-            "snacks": ["Snack option 1", "Snack option 2"],
-            "hydration_tip": "Drink 8-10 glasses of water"
+            "total_calories": {base_calories},
+            "total_protein_g": {int(base_calories * 0.3 / 4)},
+            "total_carbs_g": {int(base_calories * 0.4 / 4)},
+            "total_fat_g": {int(base_calories * 0.3 / 9)},
+            "snacks": ["Snack 1"],
+            "hydration_tip": "Hydration tip"
         }}
     ],
-    "tips": ["Tip 1", "Tip 2", "Tip 3"],
+    "tips": ["Tip 1", "Tip 2"],
     "foods_to_avoid": ["Food 1", "Food 2"],
     "foods_to_include": ["Food 1", "Food 2"]
 }}
 
-Include 4 meals per day (breakfast, lunch, dinner, post-workout/evening snack). Make meals realistic, tasty, and aligned with the user's goal and body type."""
+Include 3 meals per day (breakfast, lunch, dinner). Keep instructions SHORT."""
 
     try:
         user_msg = UserMessage(text=prompt)
